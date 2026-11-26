@@ -3,12 +3,9 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#20130f">
+    <meta name="theme-color" content="#fffaf5">
     <meta name="description" content="Peça seus lanches favoritos na Lanchotech.">
-    <title>Lanchotech — feito na hora, do seu jeito</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <title>Lanchotech — Deu fome? Resolveu.</title>
     <link rel="stylesheet" href="styles.css">
     <script src="config.js"></script>
     <script src="app.js" defer></script>
@@ -19,25 +16,16 @@
         <span class="brand-mark">L</span>
         <span>lancho<span class="brand-accent">tech</span></span>
       </a>
-      <div class="topbar-note"><span class="live-dot"></span> Pedido fresquinho, feito na hora</div>
       <button class="button button-outline admin-open" id="admin-open" type="button">Área da equipe</button>
     </header>
 
     <main>
       <section class="hero">
         <div class="hero-copy">
-          <span class="eyebrow">BATEU A FOME?</span>
-          <h1>Seu próximo<br>favorito <span>está aqui.</span></h1>
-          <p>Ingredientes de verdade, preparo na hora e aquele sabor que deixa o dia melhor.</p>
+          <span class="eyebrow">LANCHOTECH</span>
+          <h1>Deu fome?<br><span>Resolveu.</span></h1>
+          <p>Seu lanche favorito, preparado na hora.</p>
           <a class="button button-primary hero-cta" href="#cardapio">Explorar o cardápio <span aria-hidden="true">↓</span></a>
-          <div class="hero-proof"><span class="proof-stars">★★★★★</span><span>Feito com carinho em cada pedido</span></div>
-        </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="hero-orbit"></div>
-          <div class="hero-food">🍔</div>
-          <div class="floating-tag"><span>✦</span> sabor de verdade</div>
-          <div class="hero-spark spark-one">✦</div>
-          <div class="hero-spark spark-two">✳</div>
         </div>
       </section>
 
@@ -45,11 +33,9 @@
         <div class="menu-column">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">ESCOLHA SEM PRESSA</span>
               <h2>Nosso cardápio</h2>
             </div>
             <label class="search-box">
-              <span aria-hidden="true">⌕</span>
               <input id="search" type="search" placeholder="Buscar no cardápio" aria-label="Buscar produtos">
             </label>
           </div>
@@ -60,10 +46,9 @@
 
         <aside class="cart-panel" aria-label="Seu pedido">
           <div class="cart-title">
-            <div><span class="eyebrow">DO SEU JEITO</span><h2>Sua sacola <span class="cart-count" id="cart-count">0</span></h2></div>
-            <span class="cart-icon" aria-hidden="true">🛍️</span>
+            <div><h2>Sua sacola <span class="cart-count" id="cart-count">0</span></h2></div>
           </div>
-          <div class="cart-empty" id="cart-empty"><span aria-hidden="true">🍟</span><strong>Sua sacola está esperando</strong><p>Adicione algo gostoso para começar.</p></div>
+          <div class="cart-empty" id="cart-empty"><strong>Sua sacola está vazia</strong><p>Adicione um produto para começar.</p></div>
           <div class="cart-items" id="cart-items"></div>
           <div class="cart-bottom" id="cart-bottom" hidden>
             <div class="cart-total"><span>Total</span><strong id="cart-total">R$ 0,00</strong></div>

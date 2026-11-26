@@ -9,12 +9,12 @@ const statusNames = {
   concluido: "Concluído",
   cancelado: "Cancelado",
 };
-const productEmojis = {
-  hambúrguer: "🍔",
-  acompanhamento: "🍟",
-  bebida: "🥤",
-  sobremesa: "🍰",
-  combo: "🍔",
+const productIcons = {
+  hambúrguer: "burger.svg",
+  acompanhamento: "fries.svg",
+  bebida: "drink.svg",
+  sobremesa: "drink.svg",
+  combo: "burger.svg",
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -56,8 +56,8 @@ function showToast(message) {
   showToast.timeout = setTimeout(() => toast.classList.remove("visible"), 3200);
 }
 
-function emojiFor(type) {
-  return productEmojis[String(type).toLocaleLowerCase("pt-BR")] || "🍽️";
+function iconFor(type) {
+  return productIcons[String(type).toLocaleLowerCase("pt-BR")] || "burger.svg";
 }
 
 function visibleProducts() {
@@ -87,7 +87,7 @@ function renderProducts() {
     <article class="product-card">
       <div class="product-visual">
         <span class="product-chip">${escapeHtml(product.tipo)}</span>
-        <span class="product-emoji" aria-hidden="true">${emojiFor(product.tipo)}</span>
+        <img class="product-icon" src="assets/${iconFor(product.tipo)}" alt="">
       </div>
       <div class="product-info">
         <h3>${escapeHtml(product.nome)}</h3>
