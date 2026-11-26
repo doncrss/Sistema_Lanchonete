@@ -13,8 +13,9 @@ services:
       - key: CORS_ORIGINS
         value: "*"
 
-  - type: static
+  - type: web
     name: lanchotech-frontend
+    runtime: static
     buildCommand: node build-config.js
     staticPublishPath: .
     rootDir: frontend
