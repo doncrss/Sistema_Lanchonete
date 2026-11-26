@@ -134,7 +134,9 @@ footer b { color: var(--orange); }
 .variation-form input, .combo-item-row select, .combo-item-row input { min-width: 0; height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: white; font-size: 10px; }
 .variation-form .button { min-height: 34px; padding: 0 9px; font-size: 10px; }
 .combo-item-rows { margin: 12px 0; display: grid; gap: 7px; }
-.combo-item-row { display: grid; grid-template-columns: 1fr 90px auto; gap: 8px; }
+.combo-item-row { display: grid; grid-template-columns: minmax(130px, 1fr) 70px minmax(115px, 0.8fr) auto; gap: 8px; }
+.combo-item-volume:empty { display: none; }
+.combo-item-volume select { width: 100%; }
 .combo-item-row button { border: 0; background: none; color: #bd4a3e; font-size: 10px; }
 .admin-combo { margin-top: 8px; padding: 11px; border: 1px solid var(--line); border-radius: 8px; font-size: 11px; }
 .admin-combo p { margin: 5px 0; color: var(--muted); font-size: 10px; }
@@ -178,4 +180,6 @@ footer b { color: var(--orange); }
   .product-form-fields { grid-template-columns: 1fr 1fr; }
   .product-form-fields .field-label:first-child { grid-column: 1 / -1; }
   .variation-form { grid-template-columns: 1fr 1fr; }
+  .combo-item-row { grid-template-columns: minmax(0, 1fr) 64px auto; }
+  .combo-item-volume { grid-column: 1 / 3; }
 }

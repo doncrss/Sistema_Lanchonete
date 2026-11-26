@@ -16,7 +16,7 @@ from app import database
 from app.database import Base, get_db
 from app.models import pedido_models, produto_models, usuario_models
 from app.models.pedido_models import Entrega, HistoricoStatus, ItemPedido, Pedido
-from app.models.produto_models import Combo, ItemCombo, OpcaoVariacao, Produto
+from app.models.produto_models import Configuracao, Combo, ItemCombo, OpcaoVariacao, Produto
 from app.models.usuario_models import Cliente
 from app.schemas.catalogo_schemas import (
     CatalogoProdutoResponse,
@@ -64,6 +64,18 @@ def _initialize_database() -> None:
                     text(f"ALTER TABLE itens_pedido ADD COLUMN {column} {definition}")
                 )
 
+    combo_item_columns = {
+        column["name"] for column in inspect(database.engine).get_columns("itens_combo")
+    }
+    if "fk_variacao" not in combo_item_columns:
+        with database.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE itens_combo ADD COLUMN "
+                    "fk_variacao INTEGER REFERENCES produto_variacoes(id)"
+                )
+            )
+
     db = database.SessionLocal()
     try:
         if db.query(Produto).count() == 0:
@@ -73,37 +85,55 @@ def _initialize_database() -> None:
             )
             db.commit()
 
-        if db.query(OpcaoVariacao).count() == 0:
-            burgers = db.query(Produto).filter(Produto.tipo == "Hambúrguer").all()
-            for burger in burgers:
-                db.add_all(
-                    [
-                        OpcaoVariacao(
-                            fk_produto=burger.id,
-                            nome="Tamanho",
-                            valor="Tradicional",
-                            adicional=0,
-                        ),
-                        OpcaoVariacao(
-                            fk_produto=burger.id,
-                            nome="Tamanho",
-                            valor="Grande",
-                            adicional=5,
-                        ),
-                        OpcaoVariacao(
-                            fk_produto=burger.id,
-                            nome="Ponto da carne",
-                            valor="Ao ponto",
-                            adicional=0,
-                        ),
-                        OpcaoVariacao(
-                            fk_produto=burger.id,
-                            nome="Ponto da carne",
-                            valor="Bem passada",
-                            adicional=0,
-                        ),
-                    ]
+        if db.get(Configuracao, "catalogo_variacoes_iniciais_v1") is None:
+            def add_missing_variations(product: Produto, group: str, values: list[tuple[str, float]]):
+                existing_values = {
+                    option.valor
+                    for option in db.query(OpcaoVariacao)
+                    .filter(
+                        OpcaoVariacao.fk_produto == product.id,
+                        OpcaoVariacao.nome == group,
+                    )
+                    .all()
+                }
+                for value, additional in values:
+                    if value not in existing_values:
+                        db.add(
+                            OpcaoVariacao(
+                                fk_produto=product.id,
+                                nome=group,
+                                valor=value,
+                                adicional=additional,
+                            )
+                        )
+
+            for burger in db.query(Produto).filter(Produto.tipo == "Hambúrguer").all():
+                add_missing_variations(
+                    burger,
+                    "Tamanho",
+                    [("Tradicional", 0), ("Grande", 5)],
                 )
+                add_missing_variations(
+                    burger,
+                    "Ponto da carne",
+                    [("Ao ponto", 0), ("Bem passada", 0), ("Mal passada", 0)],
+                )
+
+            for product in db.query(Produto).filter(Produto.nome.ilike("%milk-shake%")).all():
+                add_missing_variations(
+                    product,
+                    "Sabor",
+                    [("Chocolate", 0), ("Morango", 0), ("Baunilha", 0), ("Ovomaltine", 0)],
+                )
+
+            for product in db.query(Produto).filter(Produto.nome.ilike("%refrigerante%")).all():
+                add_missing_variations(
+                    product,
+                    "Volume",
+                    [("Lata (350 ml)", 0), ("Garrafa (600 ml)", 4)],
+                )
+
+            db.add(Configuracao(chave="catalogo_variacoes_iniciais_v1"))
         db.commit()
     finally:
         db.close()
@@ -204,10 +234,12 @@ def _catalog_product(db: Session, product: Produto) -> CatalogoProdutoResponse:
                 produto_id=item_combo.fk_produto,
                 nome=item.nome,
                 quantidade=item_combo.quantidade,
+                variacao=f"{option.nome}: {option.valor}" if option else None,
             )
-            for item_combo, item in (
-                db.query(ItemCombo, Produto)
+            for item_combo, item, option in (
+                db.query(ItemCombo, Produto, OpcaoVariacao)
                 .join(Produto, Produto.id == ItemCombo.fk_produto)
+                .outerjoin(OpcaoVariacao, OpcaoVariacao.id == ItemCombo.fk_variacao)
                 .filter(ItemCombo.fk_combo == combo.id)
                 .all()
             )
@@ -290,6 +322,11 @@ def excluir_variacao(variacao_id: int, db: Session = Depends(get_db)):
     variacao = db.get(OpcaoVariacao, variacao_id)
     if variacao is None:
         raise HTTPException(status_code=404, detail="Variação não encontrada.")
+    if db.query(ItemCombo).filter(ItemCombo.fk_variacao == variacao_id).first():
+        raise HTTPException(
+            status_code=409,
+            detail="Variação usada em um combo não pode ser removida.",
+        )
     db.delete(variacao)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -298,8 +335,9 @@ def excluir_variacao(variacao_id: int, db: Session = Depends(get_db)):
 def _combo_response(db: Session, combo: Combo) -> ComboResponse:
     product = db.get(Produto, combo.fk_produto)
     items = (
-        db.query(ItemCombo, Produto)
+        db.query(ItemCombo, Produto, OpcaoVariacao)
         .join(Produto, Produto.id == ItemCombo.fk_produto)
+        .outerjoin(OpcaoVariacao, OpcaoVariacao.id == ItemCombo.fk_variacao)
         .filter(ItemCombo.fk_combo == combo.id)
         .all()
     )
@@ -314,8 +352,9 @@ def _combo_response(db: Session, combo: Combo) -> ComboResponse:
                 produto_id=item_combo.fk_produto,
                 nome=item.nome,
                 quantidade=item_combo.quantidade,
+                variacao=f"{option.nome}: {option.valor}" if option else None,
             )
-            for item_combo, item in items
+            for item_combo, item, option in items
         ],
     )
 
@@ -339,6 +378,25 @@ def criar_combo(payload: ComboCreate, db: Session = Depends(get_db)):
     if any(product.tipo == "Combo" for product in products.values()):
         raise HTTPException(status_code=422, detail="Não é possível adicionar um combo dentro de outro.")
 
+    variation_ids = [item.variacao_id for item in payload.itens if item.variacao_id is not None]
+    if len(set(variation_ids)) != len(variation_ids):
+        raise HTTPException(status_code=422, detail="Variação duplicada na composição do combo.")
+    variations = {
+        option.id: option
+        for option in db.query(OpcaoVariacao).filter(OpcaoVariacao.id.in_(variation_ids)).all()
+    } if variation_ids else {}
+    if len(variations) != len(variation_ids):
+        raise HTTPException(status_code=422, detail="Uma ou mais variações do combo são inválidas.")
+    for item in payload.itens:
+        if item.variacao_id is None:
+            continue
+        option = variations[item.variacao_id]
+        if option.fk_produto != item.produto_id or option.nome != "Volume":
+            raise HTTPException(
+                status_code=422,
+                detail="Selecione um volume válido para o produto do combo.",
+            )
+
     combo_product = Produto(nome=payload.nome, tipo="Combo", preco=payload.preco)
     db.add(combo_product)
     db.flush()
@@ -355,6 +413,7 @@ def criar_combo(payload: ComboCreate, db: Session = Depends(get_db)):
             fk_combo=combo.id,
             fk_produto=item.produto_id,
             quantidade=item.quantidade,
+            fk_variacao=item.variacao_id,
         )
         for item in payload.itens
     )

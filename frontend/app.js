@@ -92,7 +92,7 @@ function renderProducts() {
       <div class="product-info">
         <h3>${escapeHtml(product.nome)}</h3>
         ${product.descricao ? `<p class="product-description">${escapeHtml(product.descricao)}</p>` : ""}
-        ${product.itens_combo?.length ? `<p class="combo-contents">${product.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}`).join(" · ")}</p>` : ""}
+        ${product.itens_combo?.length ? `<p class="combo-contents">${product.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}${item.variacao ? ` · ${escapeHtml(item.variacao)}` : ""}`).join(" · ")}</p>` : ""}
         ${renderVariationSelectors(product)}
         <div class="product-buy">
           <span class="product-price" data-price-for="${product.id}">${currency.format(product.preco)}</span>
@@ -305,7 +305,7 @@ async function loadAdminProducts() {
             : `<button class="delete-product" type="button" data-delete-product="${product.id}">Excluir</button>`}
         </div>
         ${product.combo_id
-          ? `<p class="admin-option-list">${product.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}`).join(" · ")}</p>`
+          ? `<p class="admin-option-list">${product.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}${item.variacao ? ` · ${escapeHtml(item.variacao)}` : ""}`).join(" · ")}</p>`
           : `<details class="variation-manager">
               <summary>Variações (${product.variacoes.length})</summary>
               <div class="admin-option-list">${product.variacoes.map((option) => `
@@ -340,9 +340,23 @@ function addComboItemRow() {
       ${products.map((product) => `<option value="${product.id}">${escapeHtml(product.nome)}</option>`).join("")}
     </select>
     <input name="quantidade" type="number" min="1" max="50" value="1" required aria-label="Quantidade">
+    <div class="combo-item-volume"></div>
     <button type="button" data-remove-combo-item aria-label="Remover produto do combo">Remover</button>
   `;
   $("#combo-item-rows").append(row);
+  updateComboVolume(row);
+}
+
+function updateComboVolume(row) {
+  const productId = Number(row.querySelector('[name="produto_id"]').value);
+  const product = state.products.find((item) => item.id === productId);
+  const volumes = (product?.variacoes || []).filter((option) => option.nome === "Volume");
+  const container = row.querySelector(".combo-item-volume");
+  container.innerHTML = volumes.length
+    ? `<select name="variacao_id" aria-label="Volume do item no combo">${volumes.map((option) => `
+        <option value="${option.id}">${escapeHtml(option.valor)}</option>
+      `).join("")}</select>`
+    : "";
 }
 
 async function loadAdminCombos() {
@@ -358,7 +372,7 @@ async function loadAdminCombos() {
           <button class="delete-product" type="button" data-delete-combo="${combo.combo_id}">Excluir</button>
         </div>
         <p>${escapeHtml(combo.descricao || "")}</p>
-        <span>${combo.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}`).join(" · ")}</span>
+        <span>${combo.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}${item.variacao ? ` · ${escapeHtml(item.variacao)}` : ""}`).join(" · ")}</span>
       </article>
     `).join("") : '<p class="admin-empty">Ainda não há combos cadastrados.</p>';
   } catch (error) {
@@ -532,6 +546,10 @@ $("#admin-products").addEventListener("submit", async (event) => {
   }
 });
 $("#add-combo-item").addEventListener("click", addComboItemRow);
+$("#combo-item-rows").addEventListener("change", (event) => {
+  if (!event.target.matches('[name="produto_id"]')) return;
+  updateComboVolume(event.target.closest(".combo-item-row"));
+});
 $("#combo-item-rows").addEventListener("click", (event) => {
   const button = event.target.closest("[data-remove-combo-item]");
   if (!button) return;
@@ -548,6 +566,7 @@ $("#combo-form").addEventListener("submit", async (event) => {
   const items = [...$("#combo-item-rows").querySelectorAll(".combo-item-row")].map((row) => ({
     produto_id: Number(row.querySelector('[name="produto_id"]').value),
     quantidade: Number(row.querySelector('[name="quantidade"]').value),
+    variacao_id: Number(row.querySelector('[name="variacao_id"]')?.value) || null,
   }));
   $("#combo-error").textContent = "";
   try {

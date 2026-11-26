@@ -14,6 +14,7 @@ class OpcaoVariacaoResponse(OpcaoVariacaoCreate):
 class ItemComboInput(BaseModel):
     produto_id: int = Field(gt=0)
     quantidade: int = Field(gt=0, le=50)
+    variacao_id: int | None = Field(default=None, gt=0)
 
 
 class ComboCreate(BaseModel):
@@ -27,6 +28,7 @@ class ItemComboResponse(BaseModel):
     produto_id: int
     nome: str
     quantidade: int
+    variacao: str | None = None
 
 
 class ComboResponse(BaseModel):
