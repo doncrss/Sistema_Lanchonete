@@ -1,4 +1,4 @@
-const API_BASE = (window.LANCHOTECH_API_URL || "http://localhost:8000").replace(/\/$/, "");
+const API_BASE = (window.LANCHOTECH_API_URL || window.location.origin).replace(/\/$/, "");
 const state = { products: [], cart: new Map(), category: "Todos", search: "", adminToken: "" };
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const statusNames = {

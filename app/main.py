@@ -2,10 +2,12 @@ import os
 import secrets
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -75,18 +77,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-origins = [
-    origin.strip()
-    for origin in os.getenv("CORS_ORIGINS", "*").split(",")
-    if origin.strip()
-]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
 
 def require_admin(
@@ -330,3 +321,11 @@ def atualizar_status_pedido(
     )
     db.commit()
     return _pedido_response(db, pedido)
+
+
+@app.get("/", include_in_schema=False)
+def frontend():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend-assets")

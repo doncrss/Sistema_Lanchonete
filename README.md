@@ -1,10 +1,10 @@
 # Lanchotech
 
-Sistema de pedidos para lanchonete com API FastAPI, banco SQLAlchemy e frontend estático responsivo. O cliente consulta o cardápio e faz pedidos; a equipe acompanha pedidos e gerencia produtos em uma área protegida por chave administrativa.
+Sistema de pedidos para lanchonete com API FastAPI, banco SQLAlchemy e frontend responsivo. O mesmo serviço serve o site e a API; não é necessário contratar um serviço separado para o frontend.
 
 ## Rodar localmente
 
-Requer Python 3.10+ e Node.js apenas para gerar a configuração do frontend.
+Requer Python 3.10+.
 
 1. Na pasta `Sistema_Lanchonete`, crie e ative um ambiente virtual e instale as dependências:
 
@@ -14,41 +14,37 @@ Requer Python 3.10+ e Node.js apenas para gerar a configuração do frontend.
    pip install -r requirements.txt
    ```
 
-2. Configure as variáveis locais copiando `.env.example` para `.env`. Defina uma chave própria em `ADMIN_TOKEN`. O SQLite local é criado automaticamente em `banco.db`.
-3. Inicie a API em um terminal:
+2. Copie `.env.example` para `.env` e escolha uma chave local em `ADMIN_TOKEN`. O SQLite é criado automaticamente em `banco.db`.
+3. Inicie o site e a API juntos:
 
    ```powershell
    uvicorn app.main:app --reload
    ```
 
-4. Em outro terminal, dentro de `frontend`, gere a configuração (o padrão local aponta para `http://localhost:8000`) e sirva os arquivos:
+4. Abra `http://localhost:8000`. A documentação da API está em `http://localhost:8000/docs`.
 
-   ```powershell
-   node build-config.js
-   py -m http.server 5500
-   ```
+O primeiro início cadastra produtos de demonstração somente se o cardápio estiver vazio. A área administrativa usa a chave definida em `ADMIN_TOKEN`.
 
-5. Acesse `http://localhost:5500`. A documentação interativa da API fica em `http://localhost:8000/docs`.
+## Publicar no Render Free
 
-O primeiro início cadastra um cardápio de demonstração somente quando a tabela de produtos está vazia. Depois, use **Área da equipe** para entrar com `ADMIN_TOKEN`.
+O `render.yaml` cria **um único Web Service Python no plano Free**. Esse serviço entrega o site e a API pelo mesmo domínio, sem serviço Static separado e sem configuração de CORS ou de URL do frontend.
 
-## Publicar os dois serviços no Render
+1. Envie o projeto atualizado ao GitHub.
+2. No Render, crie um Blueprint para o repositório e confira que ele encontrou o `render.yaml` da raiz.
+3. Informe um valor longo e aleatório para `ADMIN_TOKEN`. Não use nem publique a chave de exemplo.
+4. Faça o deploy e abra a URL do Web Service. A API fica no mesmo domínio, em `/api`, e sua documentação em `/docs`.
 
-O `render.yaml` configura a API (`lanchotech-api`) e o frontend estático (`lanchotech-frontend`). Para dados persistentes em produção, use PostgreSQL gerenciado:
+### Persistência no plano gratuito
 
-1. Crie um banco PostgreSQL no Render e copie a **Internal Database URL**.
-2. Crie os serviços a partir do Blueprint deste repositório. Quando solicitado, informe essa URL em `DATABASE_URL` e gere um valor longo e aleatório para `ADMIN_TOKEN`. Não use a chave local de exemplo em produção.
-3. O frontend usa `https://lanchotech-api.onrender.com` por padrão. Se o Render atribuir outra URL à API, atualize `API_BASE_URL` nas variáveis do serviço estático e faça um novo deploy.
-4. Se quiser restringir chamadas do navegador, defina `CORS_ORIGINS` no serviço da API para a origem exata do frontend, por exemplo `https://lanchotech-frontend.onrender.com`.
+Por padrão, o serviço usa SQLite (`banco.db`) dentro do Web Service. No plano Free, o disco do serviço é efêmero: pedidos e alterações do cardápio **podem ser perdidos** após um novo deploy, reinício ou outra substituição da instância. O serviço gratuito também pode adormecer quando não recebe tráfego, deixando o primeiro acesso mais lento.
 
-O Render injeta `PORT` na API. O esquema inicial do banco é criado automaticamente; o campo de preço unitário dos itens de pedido também é adicionado a bancos existentes sem apagar os dados.
+Para guardar dados de forma persistente, conecte um PostgreSQL externo e configure `DATABASE_URL` nas variáveis do Web Service com a URL de conexão desse banco. Confira os limites, a política de expiração e as condições atuais do plano gratuito do provedor de banco escolhido. O SQLite local continua sendo usado se `DATABASE_URL` não estiver definida.
 
-## O que está incluído
+## Funcionalidades
 
-- Cardápio por categoria, busca, sacola e checkout responsivo.
-- Pedidos de entrega, retirada ou consumo no local. O total e os preços são calculados pela API a partir do cardápio; não são aceitos valores enviados pelo navegador.
-- Painel administrativo com chave via `X-Admin-Token`, listagem/andamento dos pedidos e cadastro/exclusão de produtos.
-- Persistência de clientes, itens, pedidos e histórico de status nas tabelas SQLAlchemy existentes.
-- Health check em `/api/health`; endpoints documentados automaticamente em `/docs`.
+- Cardápio por categoria, busca, sacola e checkout.
+- Pedidos para entrega, retirada ou consumo no local. O total e os preços são calculados pela API.
+- Área administrativa protegida por `ADMIN_TOKEN`, com consulta/status de pedidos e gerenciamento de produtos.
+- Health check em `/api/health`.
 
-O sistema registra pedidos, mas não processa pagamentos online. O pagamento é combinado no recebimento/retirada.
+O sistema registra pedidos, mas não processa pagamentos online.

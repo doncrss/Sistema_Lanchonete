@@ -1,24 +1,11 @@
 services:
   - type: web
-    name: lanchotech-api
+    name: lanchotech
     runtime: python
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL
-        sync: false
       - key: ADMIN_TOKEN
         sync: false
-      - key: CORS_ORIGINS
-        value: "*"
-
-  - type: web
-    name: lanchotech-frontend
-    runtime: static
-    buildCommand: node build-config.js
-    staticPublishPath: .
-    rootDir: frontend
-    envVars:
-      - key: API_BASE_URL
-        value: https://lanchotech-api.onrender.com
