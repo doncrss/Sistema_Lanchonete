@@ -16,8 +16,16 @@ from app import database
 from app.database import Base, get_db
 from app.models import pedido_models, produto_models, usuario_models
 from app.models.pedido_models import Entrega, HistoricoStatus, ItemPedido, Pedido
-from app.models.produto_models import Produto
+from app.models.produto_models import Combo, ItemCombo, OpcaoVariacao, Produto
 from app.models.usuario_models import Cliente
+from app.schemas.catalogo_schemas import (
+    CatalogoProdutoResponse,
+    ComboCreate,
+    ComboResponse,
+    ItemComboResponse,
+    OpcaoVariacaoCreate,
+    OpcaoVariacaoResponse,
+)
 from app.schemas.checkout_schemas import (
     ItemPedidoResponse,
     PedidoCheckout,
@@ -44,14 +52,17 @@ def _initialize_database() -> None:
     Base.metadata.create_all(bind=database.engine)
 
     item_columns = {column["name"] for column in inspect(database.engine).get_columns("itens_pedido")}
-    if "preco_unitario" not in item_columns:
-        with database.engine.begin() as connection:
-            connection.execute(
-                text(
-                    "ALTER TABLE itens_pedido "
-                    "ADD COLUMN preco_unitario FLOAT NOT NULL DEFAULT 0"
+    item_migrations = {
+        "preco_unitario": "FLOAT NOT NULL DEFAULT 0",
+        "variacao": "VARCHAR",
+        "fk_combo": "INTEGER REFERENCES combos(id)",
+    }
+    for column, definition in item_migrations.items():
+        if column not in item_columns:
+            with database.engine.begin() as connection:
+                connection.execute(
+                    text(f"ALTER TABLE itens_pedido ADD COLUMN {column} {definition}")
                 )
-            )
 
     db = database.SessionLocal()
     try:
@@ -61,6 +72,39 @@ def _initialize_database() -> None:
                 for nome, tipo, preco in PRODUTOS_INICIAIS
             )
             db.commit()
+
+        if db.query(OpcaoVariacao).count() == 0:
+            burgers = db.query(Produto).filter(Produto.tipo == "Hambúrguer").all()
+            for burger in burgers:
+                db.add_all(
+                    [
+                        OpcaoVariacao(
+                            fk_produto=burger.id,
+                            nome="Tamanho",
+                            valor="Tradicional",
+                            adicional=0,
+                        ),
+                        OpcaoVariacao(
+                            fk_produto=burger.id,
+                            nome="Tamanho",
+                            valor="Grande",
+                            adicional=5,
+                        ),
+                        OpcaoVariacao(
+                            fk_produto=burger.id,
+                            nome="Ponto da carne",
+                            valor="Ao ponto",
+                            adicional=0,
+                        ),
+                        OpcaoVariacao(
+                            fk_produto=burger.id,
+                            nome="Ponto da carne",
+                            valor="Bem passada",
+                            adicional=0,
+                        ),
+                    ]
+                )
+        db.commit()
     finally:
         db.close()
 
@@ -127,6 +171,8 @@ def _pedido_response(db: Session, pedido: Pedido) -> PedidoResponse:
             preco_unitario=item.preco_unitario,
             subtotal=round(item.preco_unitario * item.quantidade, 2),
             observacao=item.observacao,
+            variacao=item.variacao,
+            is_combo=item.fk_combo is not None,
         )
         for item, produto in linhas
     ]
@@ -149,9 +195,53 @@ def health_check(db: Session = Depends(get_db)):
     return {"status": "ok", "servico": "lanchotech"}
 
 
-@app.get("/api/produtos", response_model=list[ProdutoResponse])
+def _catalog_product(db: Session, product: Produto) -> CatalogoProdutoResponse:
+    combo = db.query(Combo).filter(Combo.fk_produto == product.id).first()
+    combo_items = []
+    if combo is not None:
+        combo_items = [
+            ItemComboResponse(
+                produto_id=item_combo.fk_produto,
+                nome=item.nome,
+                quantidade=item_combo.quantidade,
+            )
+            for item_combo, item in (
+                db.query(ItemCombo, Produto)
+                .join(Produto, Produto.id == ItemCombo.fk_produto)
+                .filter(ItemCombo.fk_combo == combo.id)
+                .all()
+            )
+        ]
+    variations = (
+        db.query(OpcaoVariacao)
+        .filter(OpcaoVariacao.fk_produto == product.id)
+        .order_by(OpcaoVariacao.nome, OpcaoVariacao.id)
+        .all()
+    )
+    return CatalogoProdutoResponse(
+        id=product.id,
+        nome=product.nome,
+        tipo=product.tipo,
+        preco=combo.preco if combo is not None else product.preco,
+        combo_id=combo.id if combo is not None else None,
+        descricao=combo.descricao if combo is not None else None,
+        itens_combo=combo_items,
+        variacoes=[
+            OpcaoVariacaoResponse(
+                id=option.id,
+                nome=option.nome,
+                valor=option.valor,
+                adicional=option.adicional,
+            )
+            for option in variations
+        ],
+    )
+
+
+@app.get("/api/produtos", response_model=list[CatalogoProdutoResponse])
 def listar_produtos(db: Session = Depends(get_db)):
-    return db.query(Produto).order_by(Produto.tipo, Produto.nome).all()
+    products = db.query(Produto).order_by(Produto.tipo, Produto.nome).all()
+    return [_catalog_product(db, product) for product in products]
 
 
 @app.get("/api/produtos/{produto_id}", response_model=ProdutoResponse)
@@ -160,6 +250,142 @@ def obter_produto(produto_id: int, db: Session = Depends(get_db)):
     if produto is None:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")
     return produto
+
+
+@app.post(
+    "/api/produtos/{produto_id}/variacoes",
+    response_model=OpcaoVariacaoResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin)],
+)
+def criar_variacao(
+    produto_id: int,
+    payload: OpcaoVariacaoCreate,
+    db: Session = Depends(get_db),
+):
+    produto = db.get(Produto, produto_id)
+    if produto is None:
+        raise HTTPException(status_code=404, detail="Produto não encontrado.")
+    if db.query(Combo).filter(Combo.fk_produto == produto_id).first():
+        raise HTTPException(status_code=422, detail="Combos não possuem variações.")
+    if db.query(OpcaoVariacao).filter(
+        OpcaoVariacao.fk_produto == produto_id,
+        OpcaoVariacao.nome == payload.nome.strip(),
+        OpcaoVariacao.valor == payload.valor.strip(),
+    ).first():
+        raise HTTPException(status_code=409, detail="Essa opção já existe para o produto.")
+    variacao = OpcaoVariacao(fk_produto=produto_id, **payload.model_dump())
+    db.add(variacao)
+    db.commit()
+    db.refresh(variacao)
+    return variacao
+
+
+@app.delete(
+    "/api/variacoes/{variacao_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def excluir_variacao(variacao_id: int, db: Session = Depends(get_db)):
+    variacao = db.get(OpcaoVariacao, variacao_id)
+    if variacao is None:
+        raise HTTPException(status_code=404, detail="Variação não encontrada.")
+    db.delete(variacao)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _combo_response(db: Session, combo: Combo) -> ComboResponse:
+    product = db.get(Produto, combo.fk_produto)
+    items = (
+        db.query(ItemCombo, Produto)
+        .join(Produto, Produto.id == ItemCombo.fk_produto)
+        .filter(ItemCombo.fk_combo == combo.id)
+        .all()
+    )
+    return ComboResponse(
+        id=combo.id,
+        produto_id=combo.fk_produto,
+        nome=product.nome,
+        descricao=combo.descricao or "",
+        preco=combo.preco,
+        itens=[
+            ItemComboResponse(
+                produto_id=item_combo.fk_produto,
+                nome=item.nome,
+                quantidade=item_combo.quantidade,
+            )
+            for item_combo, item in items
+        ],
+    )
+
+
+@app.post(
+    "/api/combos",
+    response_model=ComboResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_admin)],
+)
+def criar_combo(payload: ComboCreate, db: Session = Depends(get_db)):
+    product_ids = [item.produto_id for item in payload.itens]
+    if len(set(product_ids)) != len(product_ids):
+        raise HTTPException(status_code=422, detail="Cada produto deve aparecer uma vez no combo.")
+    products = {
+        product.id: product
+        for product in db.query(Produto).filter(Produto.id.in_(product_ids)).all()
+    }
+    if len(products) != len(product_ids):
+        raise HTTPException(status_code=422, detail="Um ou mais produtos do combo não existem.")
+    if any(product.tipo == "Combo" for product in products.values()):
+        raise HTTPException(status_code=422, detail="Não é possível adicionar um combo dentro de outro.")
+
+    combo_product = Produto(nome=payload.nome, tipo="Combo", preco=payload.preco)
+    db.add(combo_product)
+    db.flush()
+    combo = Combo(
+        nome=payload.nome,
+        descricao=payload.descricao.strip(),
+        preco=payload.preco,
+        fk_produto=combo_product.id,
+    )
+    db.add(combo)
+    db.flush()
+    db.add_all(
+        ItemCombo(
+            fk_combo=combo.id,
+            fk_produto=item.produto_id,
+            quantidade=item.quantidade,
+        )
+        for item in payload.itens
+    )
+    db.commit()
+    db.refresh(combo)
+    return _combo_response(db, combo)
+
+
+@app.delete(
+    "/api/combos/{combo_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_admin)],
+)
+def excluir_combo(combo_id: int, db: Session = Depends(get_db)):
+    combo = db.get(Combo, combo_id)
+    if combo is None:
+        raise HTTPException(status_code=404, detail="Combo não encontrado.")
+    if db.query(ItemPedido).filter(
+        (ItemPedido.fk_combo == combo.id) | (ItemPedido.fk_produto == combo.fk_produto)
+    ).first():
+        raise HTTPException(
+            status_code=409,
+            detail="Combo vinculado a um pedido não pode ser excluído.",
+        )
+    product = db.get(Produto, combo.fk_produto)
+    db.query(ItemCombo).filter(ItemCombo.fk_combo == combo.id).delete()
+    db.delete(combo)
+    if product is not None:
+        db.delete(product)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post(
@@ -205,6 +431,7 @@ def excluir_produto(produto_id: int, db: Session = Depends(get_db)):
     produto = db.get(Produto, produto_id)
     if produto is None:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")
+    db.query(OpcaoVariacao).filter(OpcaoVariacao.fk_produto == produto_id).delete()
     db.delete(produto)
     try:
         db.commit()
@@ -237,6 +464,41 @@ def criar_pedido(payload: PedidoCheckout, db: Session = Depends(get_db)):
     if len(produtos) != len(produto_ids):
         raise HTTPException(status_code=422, detail="Um ou mais produtos não existem.")
 
+    combo_ids = {item.combo_id for item in payload.itens if item.combo_id is not None}
+    combos = {
+        combo.id: combo
+        for combo in db.query(Combo).filter(Combo.id.in_(combo_ids)).all()
+    } if combo_ids else {}
+    variations_by_item: dict[int, list[OpcaoVariacao]] = {}
+    for index, item in enumerate(payload.itens):
+        if item.combo_id is not None:
+            combo = combos.get(item.combo_id)
+            if combo is None or combo.fk_produto != item.produto_id:
+                raise HTTPException(status_code=422, detail="Combo inválido.")
+            if item.variacao_ids:
+                raise HTTPException(status_code=422, detail="Combos não possuem variações.")
+            continue
+        if produtos[item.produto_id].tipo == "Combo":
+            raise HTTPException(status_code=422, detail="Selecione um combo válido.")
+        option_ids = set(item.variacao_ids)
+        if len(option_ids) != len(item.variacao_ids):
+            raise HTTPException(status_code=422, detail="Variação duplicada.")
+        available_options = (
+            db.query(OpcaoVariacao)
+            .filter(OpcaoVariacao.fk_produto == item.produto_id)
+            .all()
+        )
+        options = [option for option in available_options if option.id in option_ids]
+        if len(options) != len(option_ids):
+            raise HTTPException(status_code=422, detail="Uma ou mais variações são inválidas.")
+        if len({option.nome for option in options}) != len(options):
+            raise HTTPException(status_code=422, detail="Escolha apenas uma opção por variação.")
+        expected_groups = {option.nome for option in available_options}
+        selected_groups = {option.nome for option in options}
+        if expected_groups != selected_groups:
+            raise HTTPException(status_code=422, detail="Escolha uma opção para cada variação disponível.")
+        variations_by_item[index] = options
+
     cliente = (
         db.query(Cliente)
         .filter(Cliente.contato == payload.cliente.contato.strip())
@@ -259,16 +521,24 @@ def criar_pedido(payload: PedidoCheckout, db: Session = Depends(get_db)):
     pedido = Pedido(local=payload.local, fk_cliente=cliente.id)
     db.add(pedido)
     db.flush()
-    db.add_all(
-        ItemPedido(
-            fk_pedido=pedido.id,
-            fk_produto=item.produto_id,
-            quantidade=item.quantidade,
-            observacao=item.observacao.strip() if item.observacao else None,
-            preco_unitario=produtos[item.produto_id].preco,
+    order_items = []
+    for index, item in enumerate(payload.itens):
+        combo = combos.get(item.combo_id) if item.combo_id is not None else None
+        options = variations_by_item.get(index, [])
+        base_price = combo.preco if combo is not None else produtos[item.produto_id].preco
+        option_label = ", ".join(f"{option.nome}: {option.valor}" for option in options) or None
+        order_items.append(
+            ItemPedido(
+                fk_pedido=pedido.id,
+                fk_produto=item.produto_id,
+                fk_combo=combo.id if combo else None,
+                quantidade=item.quantidade,
+                observacao=item.observacao.strip() if item.observacao else None,
+                variacao=option_label,
+                preco_unitario=round(base_price + sum(option.adicional for option in options), 2),
+            )
         )
-        for item in payload.itens
-    )
+    db.add_all(order_items)
     db.add(
         HistoricoStatus(
             fk_pedido=pedido.id,

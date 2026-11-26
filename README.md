@@ -25,6 +25,8 @@ Requer Python 3.10+.
 
 O primeiro início cadastra produtos de demonstração somente se o cardápio estiver vazio. A área administrativa usa a chave definida em `ADMIN_TOKEN`.
 
+No painel, a aba **Produtos** permite adicionar ou remover opções por grupo (por exemplo, tamanho e ponto da carne) e definir o adicional de preço. A aba **Combos** monta uma oferta a partir de pelo menos dois produtos já cadastrados e define o preço próprio do combo. Os hambúrgueres iniciais recebem opções de tamanho e ponto da carne; novos produtos podem receber suas próprias opções pelo painel.
+
 ## Publicar no Render Free
 
 O `render.yaml` cria **um único Web Service Python no plano Free**. Esse serviço entrega o site e a API pelo mesmo domínio, sem serviço Static separado e sem configuração de CORS ou de URL do frontend.
@@ -43,8 +45,10 @@ Para guardar dados de forma persistente, conecte um PostgreSQL externo e configu
 ## Funcionalidades
 
 - Cardápio por categoria, busca, sacola e checkout.
+- Variações de tamanho e ponto da carne nos hambúrgueres; o adicional escolhido é validado no servidor e preservado no pedido.
+- Combos com itens e quantidades configuráveis, preço promocional definido pela equipe e identificação no pedido.
 - Pedidos para entrega, retirada ou consumo no local. O total e os preços são calculados pela API.
-- Área administrativa protegida por `ADMIN_TOKEN`, com consulta/status de pedidos e gerenciamento de produtos.
+- Área administrativa protegida por `ADMIN_TOKEN`, com consulta/status de pedidos, gerenciamento de produtos, variações e combos.
 - Health check em `/api/health`.
 
 O sistema registra pedidos, mas não processa pagamentos online.

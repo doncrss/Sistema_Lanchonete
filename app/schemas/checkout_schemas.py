@@ -13,6 +13,8 @@ class ItemPedidoInput(BaseModel):
     produto_id: int = Field(gt=0)
     quantidade: int = Field(gt=0, le=50)
     observacao: str | None = Field(default=None, max_length=240)
+    combo_id: int | None = Field(default=None, gt=0)
+    variacao_ids: list[int] = Field(default_factory=list, max_length=10)
 
 
 class PedidoCheckout(BaseModel):
@@ -40,6 +42,8 @@ class ItemPedidoResponse(BaseModel):
     preco_unitario: float
     subtotal: float
     observacao: str | None
+    variacao: str | None
+    is_combo: bool
 
 
 class PedidoResponse(BaseModel):

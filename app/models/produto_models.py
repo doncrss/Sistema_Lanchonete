@@ -46,6 +46,16 @@ class ItemCombo(Base):
     fk_produto = Column(Integer, ForeignKey("produtos.id"), nullable=False)
 
 
+class OpcaoVariacao(Base):
+    __tablename__ = "produto_variacoes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
+    valor = Column(String, nullable=False)
+    adicional = Column(Float, nullable=False, default=0)
+    fk_produto = Column(Integer, ForeignKey("produtos.id"), nullable=False, index=True)
+
+
 class Promocao(Base):
     __tablename__ = "promocoes"
 

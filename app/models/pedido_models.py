@@ -50,6 +50,8 @@ class ItemPedido(Base):
     quantidade = Column(Integer, nullable=False)
     observacao = Column(String, nullable=True)
     preco_unitario = Column(Float, nullable=False, default=0)
+    variacao = Column(String, nullable=True)
+    fk_combo = Column(Integer, ForeignKey("combos.id"), nullable=True)
 
     fk_pedido = Column(
         Integer,

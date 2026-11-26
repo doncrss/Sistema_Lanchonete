@@ -103,7 +103,7 @@
           <button class="button button-primary button-wide" type="submit">Acessar painel</button>
         </form>
         <div id="admin-content" hidden>
-          <div class="admin-tabs"><button type="button" class="admin-tab active" data-tab="orders">Pedidos</button><button type="button" class="admin-tab" data-tab="products">Produtos</button><button type="button" id="admin-logout" class="text-button">Sair</button></div>
+          <div class="admin-tabs"><button type="button" class="admin-tab active" data-tab="orders">Pedidos</button><button type="button" class="admin-tab" data-tab="products">Produtos</button><button type="button" class="admin-tab" data-tab="combos">Combos</button><button type="button" id="admin-logout" class="text-button">Sair</button></div>
           <div class="admin-pane" id="orders-pane"><div class="admin-list-heading"><h3>Pedidos recentes</h3><button class="text-button" type="button" id="refresh-orders">Atualizar ↻</button></div><div class="admin-orders" id="admin-orders"></div></div>
           <div class="admin-pane" id="products-pane" hidden>
             <form class="product-form" id="product-form">
@@ -112,6 +112,22 @@
               <button class="button button-primary" type="submit">Adicionar produto</button>
             </form>
             <div class="admin-list-heading"><h3>Cardápio atual</h3></div><div class="admin-products" id="admin-products"></div>
+          </div>
+          <div class="admin-pane" id="combos-pane" hidden>
+            <form class="product-form" id="combo-form">
+              <h3>Criar combo</h3>
+              <div class="product-form-fields combo-form-fields">
+                <label class="field-label">Nome<input name="nome" required minlength="2" maxlength="120" placeholder="Ex.: Combo clássico"></label>
+                <label class="field-label">Preço do combo<input name="preco" required type="number" min="0" max="10000" step="0.01"></label>
+                <label class="field-label">Descrição<input name="descricao" maxlength="300" placeholder="Uma breve descrição"></label>
+              </div>
+              <div class="combo-item-rows" id="combo-item-rows"></div>
+              <button class="text-button" type="button" id="add-combo-item">+ Adicionar produto</button>
+              <button class="button button-primary" type="submit">Salvar combo</button>
+              <p class="form-error" id="combo-error" role="alert"></p>
+            </form>
+            <div class="admin-list-heading"><h3>Combos no cardápio</h3></div>
+            <div class="admin-combos" id="admin-combos"></div>
           </div>
         </div>
       </section>

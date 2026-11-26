@@ -73,7 +73,7 @@ function renderCategories() {
   const categories = ["Todos", ...new Set(state.products.map((product) => product.tipo))];
   if (!categories.includes(state.category)) state.category = "Todos";
   $("#categories").innerHTML = categories.map((category) => `
-    <button class="category-button${state.category === category ? " active" : ""}" type="button" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>
+    <button class="category-button${state.category === category ? " active" : ""}" type="button" data-category="${escapeHtml(category)}">${category === "Combo" ? "Combos" : escapeHtml(category)}</button>
   `).join("");
 }
 
@@ -91,42 +91,82 @@ function renderProducts() {
       </div>
       <div class="product-info">
         <h3>${escapeHtml(product.nome)}</h3>
-        <p>Preparado na hora com ingredientes selecionados.</p>
+        ${product.descricao ? `<p class="product-description">${escapeHtml(product.descricao)}</p>` : ""}
+        ${product.itens_combo?.length ? `<p class="combo-contents">${product.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}`).join(" · ")}</p>` : ""}
+        ${renderVariationSelectors(product)}
         <div class="product-buy">
-          <span class="product-price">${currency.format(product.preco)}</span>
-          <button class="add-button" type="button" data-add="${product.id}" aria-label="Adicionar ${escapeHtml(product.nome)}">+</button>
+          <span class="product-price" data-price-for="${product.id}">${currency.format(product.preco)}</span>
+          <button class="add-button" type="button" data-add="${product.id}" data-combo="${product.combo_id || ""}" aria-label="Adicionar ${escapeHtml(product.nome)}">+</button>
         </div>
       </div>
     </article>
   `).join("");
 }
 
+function renderVariationSelectors(product) {
+  if (!product.variacoes?.length) return "";
+  const groups = [...new Set(product.variacoes.map((option) => option.nome))];
+  return `<div class="variation-options">${groups.map((group) => `
+    <label class="variation-label">${escapeHtml(group)}
+      <select class="variation-select" data-product="${product.id}" data-group="${escapeHtml(group)}">
+        ${product.variacoes.filter((option) => option.nome === group).map((option) => `
+          <option value="${option.id}">${escapeHtml(option.valor)}${option.adicional ? ` (+ ${currency.format(option.adicional)})` : ""}</option>
+        `).join("")}
+      </select>
+    </label>
+  `).join("")}</div>`;
+}
+
+function optionsForProduct(productId) {
+  const card = [...document.querySelectorAll(".product-card")].find((item) =>
+    item.querySelector(`[data-add="${productId}"]`),
+  );
+  if (!card) return [];
+  return [...card.querySelectorAll(".variation-select")].map((select) => Number(select.value));
+}
+
+function selectedOptions(product, optionIds) {
+  return (product.variacoes || []).filter((option) => optionIds.includes(option.id));
+}
+
+function productPrice(product, optionIds = []) {
+  return product.preco + selectedOptions(product, optionIds)
+    .reduce((total, option) => total + option.adicional, 0);
+}
+
 function cartTotals() {
   let count = 0;
   let total = 0;
-  for (const [productId, quantity] of state.cart) {
-    const product = state.products.find((item) => item.id === productId);
+  for (const line of state.cart.values()) {
+    const product = state.products.find((item) => item.id === line.productId);
     if (!product) continue;
-    count += quantity;
-    total += product.preco * quantity;
+    count += line.quantity;
+    total += productPrice(product, line.variationIds) * line.quantity;
   }
   return { count, total };
 }
 
 function renderCart() {
-  const items = [...state.cart.entries()].filter(([id]) => state.products.some((product) => product.id === id));
+  const items = [...state.cart.entries()].filter(([, line]) =>
+    state.products.some((product) => product.id === line.productId),
+  );
   const { count, total } = cartTotals();
   $("#cart-count").textContent = count;
   $("#cart-empty").hidden = items.length > 0;
-  $("#cart-items").innerHTML = items.map(([id, quantity]) => {
-    const product = state.products.find((item) => item.id === id);
+  $("#cart-items").innerHTML = items.map(([key, line]) => {
+    const product = state.products.find((item) => item.id === line.productId);
+    const variationNames = selectedOptions(product, line.variationIds)
+      .map((option) => `${option.nome}: ${option.valor}`);
     return `
       <div class="cart-line">
-        <div><div class="cart-line-name">${escapeHtml(product.nome)}</div><div class="cart-line-price">${currency.format(product.preco * quantity)}</div></div>
+        <div><div class="cart-line-name">${escapeHtml(product.nome)}</div>
+          ${variationNames.length ? `<div class="cart-line-option">${variationNames.map(escapeHtml).join(" · ")}</div>` : ""}
+          <div class="cart-line-price">${currency.format(productPrice(product, line.variationIds) * line.quantity)}</div>
+        </div>
         <div class="quantity-control">
-          <button type="button" data-quantity="-1" data-id="${id}" aria-label="Remover um ${escapeHtml(product.nome)}">−</button>
-          <span>${quantity}</span>
-          <button type="button" data-quantity="1" data-id="${id}" aria-label="Adicionar um ${escapeHtml(product.nome)}">+</button>
+          <button type="button" data-quantity="-1" data-key="${key}" aria-label="Remover um ${escapeHtml(product.nome)}">−</button>
+          <span>${line.quantity}</span>
+          <button type="button" data-quantity="1" data-key="${key}" aria-label="Adicionar um ${escapeHtml(product.nome)}">+</button>
         </div>
       </div>`;
   }).join("");
@@ -149,9 +189,23 @@ async function loadProducts() {
 }
 
 function changeQuantity(productId, delta) {
-  const quantity = (state.cart.get(productId) || 0) + delta;
-  if (quantity <= 0) state.cart.delete(productId);
-  else state.cart.set(productId, quantity);
+  const line = state.cart.get(productId);
+  if (!line) return;
+  line.quantity += delta;
+  if (line.quantity <= 0) state.cart.delete(productId);
+  renderCart();
+}
+
+function addToCart(product, variationIds) {
+  const key = `${product.id}-${product.combo_id || 0}-${variationIds.join(".")}`;
+  const line = state.cart.get(key);
+  if (line) line.quantity += 1;
+  else state.cart.set(key, {
+    productId: product.id,
+    comboId: product.combo_id,
+    variationIds,
+    quantity: 1,
+  });
   renderCart();
 }
 
@@ -180,7 +234,12 @@ async function submitCheckout(event) {
           contato: values.get("contato"),
           endereco: values.get("endereco"),
         },
-        itens: [...state.cart].map(([produto_id, quantidade]) => ({ produto_id, quantidade })),
+        itens: [...state.cart.values()].map((line) => ({
+          produto_id: line.productId,
+          quantidade: line.quantity,
+          combo_id: line.comboId,
+          variacao_ids: line.variationIds,
+        })),
       }),
     });
     state.cart.clear();
@@ -205,6 +264,7 @@ function showAdminPane(name) {
   });
   $("#orders-pane").hidden = name !== "orders";
   $("#products-pane").hidden = name !== "products";
+  $("#combos-pane").hidden = name !== "combos";
 }
 
 async function loadAdminOrders() {
@@ -216,7 +276,7 @@ async function loadAdminOrders() {
       <article class="admin-order">
         <div class="admin-order-head"><span>Pedido #${order.id} · ${escapeHtml(order.cliente_nome)}</span><span>${escapeHtml(statusNames[order.status] || order.status)}</span></div>
         <div class="admin-order-meta">${escapeHtml(order.local)} · ${escapeHtml(new Date(order.data_hora).toLocaleString("pt-BR"))}<br>${escapeHtml(order.cliente_contato)}${order.endereco_entrega ? ` · ${escapeHtml(order.endereco_entrega)}` : ""}</div>
-        <div class="admin-order-items">${order.itens.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}`).join(" · ")}</div>
+        <div class="admin-order-items">${order.itens.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}${item.variacao ? ` (${escapeHtml(item.variacao)})` : ""}`).join(" · ")}</div>
         <div class="admin-order-bottom"><strong>${currency.format(order.total)}</strong>
           <select data-status-order="${order.id}" aria-label="Atualizar status do pedido ${order.id}">
             ${Object.entries(statusNames).map(([value, name]) => `<option value="${value}"${value === order.status ? " selected" : ""}>${name}</option>`).join("")}
@@ -237,11 +297,70 @@ async function loadAdminProducts() {
   try {
     const products = await api("/api/produtos");
     container.innerHTML = products.map((product) => `
-      <div class="admin-product">
-        <div><strong>${escapeHtml(product.nome)}</strong><br><span>${escapeHtml(product.tipo)} · ${currency.format(product.preco)}</span></div>
-        <button class="delete-product" type="button" data-delete-product="${product.id}">Excluir</button>
-      </div>
+      <article class="admin-product">
+        <div class="admin-product-heading">
+          <div><strong>${escapeHtml(product.nome)}</strong><br><span>${escapeHtml(product.tipo)} · ${currency.format(product.preco)}</span></div>
+          ${product.combo_id
+            ? `<button class="delete-product" type="button" data-delete-combo="${product.combo_id}">Excluir combo</button>`
+            : `<button class="delete-product" type="button" data-delete-product="${product.id}">Excluir</button>`}
+        </div>
+        ${product.combo_id
+          ? `<p class="admin-option-list">${product.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}`).join(" · ")}</p>`
+          : `<details class="variation-manager">
+              <summary>Variações (${product.variacoes.length})</summary>
+              <div class="admin-option-list">${product.variacoes.map((option) => `
+                <span>${escapeHtml(option.nome)}: ${escapeHtml(option.valor)}${option.adicional ? ` (+ ${currency.format(option.adicional)})` : ""}
+                  <button class="delete-product" type="button" data-delete-variation="${option.id}">Remover</button>
+                </span>
+              `).join("") || "<span>Sem opções cadastradas.</span>"}</div>
+              <form class="variation-form" data-variation-product="${product.id}">
+                <input name="nome" required minlength="2" maxlength="50" placeholder="Grupo (ex.: Tamanho)" aria-label="Grupo da variação">
+                <input name="valor" required maxlength="60" placeholder="Opção (ex.: Grande)" aria-label="Nome da opção">
+                <input name="adicional" type="number" min="0" max="10000" step="0.01" value="0" aria-label="Adicional de preço">
+                <button class="button button-outline" type="submit">Adicionar opção</button>
+              </form>
+            </details>`}
+      </article>
     `).join("");
+  } catch (error) {
+    container.innerHTML = `<p class="admin-empty">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+function addComboItemRow() {
+  const products = state.products.filter((product) => !product.combo_id);
+  if (!products.length) {
+    showToast("Cadastre produtos antes de montar um combo.");
+    return;
+  }
+  const row = document.createElement("div");
+  row.className = "combo-item-row";
+  row.innerHTML = `
+    <select name="produto_id" required aria-label="Produto do combo">
+      ${products.map((product) => `<option value="${product.id}">${escapeHtml(product.nome)}</option>`).join("")}
+    </select>
+    <input name="quantidade" type="number" min="1" max="50" value="1" required aria-label="Quantidade">
+    <button type="button" data-remove-combo-item aria-label="Remover produto do combo">Remover</button>
+  `;
+  $("#combo-item-rows").append(row);
+}
+
+async function loadAdminCombos() {
+  const container = $("#admin-combos");
+  container.innerHTML = '<p class="admin-empty">Carregando combos...</p>';
+  try {
+    const products = await api("/api/produtos");
+    const combos = products.filter((product) => product.combo_id);
+    container.innerHTML = combos.length ? combos.map((combo) => `
+      <article class="admin-combo">
+        <div class="admin-combo-heading">
+          <strong>${escapeHtml(combo.nome)} · ${currency.format(combo.preco)}</strong>
+          <button class="delete-product" type="button" data-delete-combo="${combo.combo_id}">Excluir</button>
+        </div>
+        <p>${escapeHtml(combo.descricao || "")}</p>
+        <span>${combo.itens_combo.map((item) => `${item.quantidade}× ${escapeHtml(item.nome)}`).join(" · ")}</span>
+      </article>
+    `).join("") : '<p class="admin-empty">Ainda não há combos cadastrados.</p>';
   } catch (error) {
     container.innerHTML = `<p class="admin-empty">${escapeHtml(error.message)}</p>`;
   }
@@ -274,13 +393,24 @@ $("#categories").addEventListener("click", (event) => {
 $("#products").addEventListener("click", (event) => {
   const button = event.target.closest("[data-add]");
   if (!button) return;
-  changeQuantity(Number(button.dataset.add), 1);
+  const product = state.products.find((item) => item.id === Number(button.dataset.add));
+  if (!product) return;
+  addToCart(product, optionsForProduct(product.id));
   showToast("Adicionado à sua sacola!");
 });
 
 $("#cart-items").addEventListener("click", (event) => {
   const button = event.target.closest("[data-quantity]");
-  if (button) changeQuantity(Number(button.dataset.id), Number(button.dataset.quantity));
+  if (button) changeQuantity(button.dataset.key, Number(button.dataset.quantity));
+});
+
+$("#products").addEventListener("change", (event) => {
+  const select = event.target.closest(".variation-select");
+  if (!select) return;
+  const product = state.products.find((item) => item.id === Number(select.dataset.product));
+  if (!product) return;
+  const price = productPrice(product, optionsForProduct(product.id));
+  $(`[data-price-for="${product.id}"]`).textContent = currency.format(price);
 });
 
 $("#search").addEventListener("input", (event) => {
@@ -306,7 +436,14 @@ document.querySelectorAll(".admin-tab[data-tab]").forEach((tab) => {
   tab.addEventListener("click", () => {
     showAdminPane(tab.dataset.tab);
     if (tab.dataset.tab === "orders") loadAdminOrders();
-    else loadAdminProducts();
+    else if (tab.dataset.tab === "products") loadAdminProducts();
+    else {
+      loadAdminCombos();
+      if ($("#combo-item-rows").children.length === 0) {
+        addComboItemRow();
+        addComboItemRow();
+      }
+    }
   });
 });
 $("#admin-logout").addEventListener("click", () => {
@@ -353,12 +490,93 @@ $("#product-form").addEventListener("submit", async (event) => {
   }
 });
 $("#admin-products").addEventListener("click", async (event) => {
+  const removeVariation = event.target.closest("[data-delete-variation]");
+  if (removeVariation) {
+    try {
+      await api(`/api/variacoes/${removeVariation.dataset.deleteVariation}`, { method: "DELETE" }, true);
+      showToast("Variação removida.");
+      await Promise.all([loadAdminProducts(), loadProducts()]);
+    } catch (error) {
+      showToast(error.message);
+    }
+    return;
+  }
   const button = event.target.closest("[data-delete-product]");
   if (!button || !window.confirm("Excluir este produto do cardápio?")) return;
   try {
     await api(`/api/produtos/${button.dataset.deleteProduct}`, { method: "DELETE" }, true);
     showToast("Produto excluído.");
     await Promise.all([loadAdminProducts(), loadProducts()]);
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+$("#admin-products").addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-variation-product]");
+  if (!form) return;
+  event.preventDefault();
+  const values = new FormData(form);
+  try {
+    await api(`/api/produtos/${form.dataset.variationProduct}/variacoes`, {
+      method: "POST",
+      body: JSON.stringify({
+        nome: values.get("nome"),
+        valor: values.get("valor"),
+        adicional: Number(values.get("adicional")),
+      }),
+    }, true);
+    showToast("Variação adicionada.");
+    await Promise.all([loadAdminProducts(), loadProducts()]);
+  } catch (error) {
+    showToast(error.message);
+  }
+});
+$("#add-combo-item").addEventListener("click", addComboItemRow);
+$("#combo-item-rows").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-combo-item]");
+  if (!button) return;
+  if ($("#combo-item-rows").children.length <= 2) {
+    showToast("Um combo precisa ter pelo menos dois produtos.");
+    return;
+  }
+  button.closest(".combo-item-row").remove();
+});
+$("#combo-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const values = new FormData(form);
+  const items = [...$("#combo-item-rows").querySelectorAll(".combo-item-row")].map((row) => ({
+    produto_id: Number(row.querySelector('[name="produto_id"]').value),
+    quantidade: Number(row.querySelector('[name="quantidade"]').value),
+  }));
+  $("#combo-error").textContent = "";
+  try {
+    await api("/api/combos", {
+      method: "POST",
+      body: JSON.stringify({
+        nome: values.get("nome"),
+        descricao: values.get("descricao"),
+        preco: Number(values.get("preco")),
+        itens: items,
+      }),
+    }, true);
+    form.reset();
+    $("#combo-item-rows").replaceChildren();
+    addComboItemRow();
+    addComboItemRow();
+    showToast("Combo adicionado ao cardápio.");
+    await Promise.all([loadAdminCombos(), loadProducts(), loadAdminProducts()]);
+  } catch (error) {
+    $("#combo-error").textContent = error.message;
+  }
+});
+$("#admin-modal").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-delete-combo]");
+  if (!button || !window.confirm("Excluir este combo do cardápio?")) return;
+  try {
+    await api(`/api/combos/${button.dataset.deleteCombo}`, { method: "DELETE" }, true);
+    showToast("Combo excluído.");
+    await Promise.all([loadAdminCombos(), loadProducts(), loadAdminProducts()]);
   } catch (error) {
     showToast(error.message);
   }
