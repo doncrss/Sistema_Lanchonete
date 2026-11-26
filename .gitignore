@@ -60,6 +60,8 @@ cover/
 *.log
 local_settings.py
 db.sqlite3
+banco.db
+banco.db-journal
 db.sqlite3-journal
 
 # Flask stuff:
@@ -152,6 +154,8 @@ activemq-data/
 # Environments
 .env
 .envrc
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -204,6 +208,7 @@ cython_debug/
 # .vscode/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
+frontend/config.js
 
 # Ruff stuff:
 .ruff_cache/

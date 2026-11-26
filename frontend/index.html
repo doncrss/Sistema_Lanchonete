@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#20130f">
+    <meta name="description" content="Peça seus lanches favoritos na Lanchotech.">
+    <title>Lanchotech — feito na hora, do seu jeito</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Lanchotech, início">
+        <span class="brand-mark">L</span>
+        <span>lancho<span class="brand-accent">tech</span></span>
+      </a>
+      <div class="topbar-note"><span class="live-dot"></span> Pedido fresquinho, feito na hora</div>
+      <button class="button button-outline admin-open" id="admin-open" type="button">Área da equipe</button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">BATEU A FOME?</span>
+          <h1>Seu próximo<br>favorito <span>está aqui.</span></h1>
+          <p>Ingredientes de verdade, preparo na hora e aquele sabor que deixa o dia melhor.</p>
+          <a class="button button-primary hero-cta" href="#cardapio">Explorar o cardápio <span aria-hidden="true">↓</span></a>
+          <div class="hero-proof"><span class="proof-stars">★★★★★</span><span>Feito com carinho em cada pedido</span></div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="hero-orbit"></div>
+          <div class="hero-food">🍔</div>
+          <div class="floating-tag"><span>✦</span> sabor de verdade</div>
+          <div class="hero-spark spark-one">✦</div>
+          <div class="hero-spark spark-two">✳</div>
+        </div>
+      </section>
+
+      <section class="order-area" id="cardapio">
+        <div class="menu-column">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">ESCOLHA SEM PRESSA</span>
+              <h2>Nosso cardápio</h2>
+            </div>
+            <label class="search-box">
+              <span aria-hidden="true">⌕</span>
+              <input id="search" type="search" placeholder="Buscar no cardápio" aria-label="Buscar produtos">
+            </label>
+          </div>
+          <nav class="categories" id="categories" aria-label="Categorias do cardápio"></nav>
+          <div class="menu-message" id="menu-message" role="status">Carregando o cardápio...</div>
+          <div class="product-grid" id="products"></div>
+        </div>
+
+        <aside class="cart-panel" aria-label="Seu pedido">
+          <div class="cart-title">
+            <div><span class="eyebrow">DO SEU JEITO</span><h2>Sua sacola <span class="cart-count" id="cart-count">0</span></h2></div>
+            <span class="cart-icon" aria-hidden="true">🛍️</span>
+          </div>
+          <div class="cart-empty" id="cart-empty"><span aria-hidden="true">🍟</span><strong>Sua sacola está esperando</strong><p>Adicione algo gostoso para começar.</p></div>
+          <div class="cart-items" id="cart-items"></div>
+          <div class="cart-bottom" id="cart-bottom" hidden>
+            <div class="cart-total"><span>Total</span><strong id="cart-total">R$ 0,00</strong></div>
+            <button class="button button-primary checkout-open" id="checkout-open" type="button">Continuar para entrega <span aria-hidden="true">→</span></button>
+            <small>O pagamento é combinado na entrega ou retirada.</small>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <footer><a class="brand footer-brand" href="#"><span class="brand-mark">L</span><span>lancho<span class="brand-accent">tech</span></span></a><span>Feito na hora. Feito pra você. <b>♥</b></span></footer>
+
+    <dialog class="modal" id="checkout-modal">
+      <form class="modal-card" id="checkout-form">
+        <button class="modal-close" type="button" data-close="checkout-modal" aria-label="Fechar">×</button>
+        <span class="eyebrow">SÓ MAIS UM PASSO</span>
+        <h2>Onde entregamos?</h2>
+        <p class="modal-intro">Preencha seus dados para enviarmos seu pedido para a cozinha.</p>
+        <label class="field-label">Seu nome<input name="nome" required minlength="2" maxlength="120" autocomplete="name" placeholder="Como podemos te chamar?"></label>
+        <label class="field-label">WhatsApp<input name="contato" required minlength="8" maxlength="40" autocomplete="tel" placeholder="(11) 99999-9999"></label>
+        <label class="field-label">Como prefere receber?
+          <select name="local" id="order-local">
+            <option value="entrega">Entrega</option>
+            <option value="retirada">Retirada no balcão</option>
+            <option value="mesa">Consumir no local</option>
+          </select>
+        </label>
+        <label class="field-label" id="address-field">Endereço de entrega<input name="endereco" maxlength="240" autocomplete="street-address" placeholder="Rua, número e complemento"></label>
+        <div class="checkout-total"><span>Total do pedido</span><strong id="checkout-total">R$ 0,00</strong></div>
+        <p class="form-error" id="checkout-error" role="alert"></p>
+        <button class="button button-primary button-wide" type="submit">Enviar pedido <span aria-hidden="true">→</span></button>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="confirmation-modal">
+      <div class="modal-card confirmation-card">
+        <span class="confirmation-icon" aria-hidden="true">✓</span>
+        <span class="eyebrow">PEDIDO NA COZINHA</span>
+        <h2>Recebemos seu pedido!</h2>
+        <p class="modal-intro" id="confirmation-copy"></p>
+        <button class="button button-primary button-wide" type="button" data-close="confirmation-modal">Voltar ao cardápio</button>
+      </div>
+    </dialog>
+
+    <dialog class="modal admin-modal" id="admin-modal">
+      <section class="modal-card admin-card">
+        <button class="modal-close" type="button" data-close="admin-modal" aria-label="Fechar">×</button>
+        <div class="admin-heading"><div><span class="eyebrow">BASTIDORES</span><h2>Área da equipe</h2></div><span class="admin-badge">LANCHOTECH</span></div>
+        <form id="admin-login" class="admin-login">
+          <p>Digite a chave administrativa configurada para sua loja.</p>
+          <label class="field-label">Chave de acesso<input name="token" type="password" required autocomplete="current-password" placeholder="Sua chave secreta"></label>
+          <p class="form-error" id="admin-error" role="alert"></p>
+          <button class="button button-primary button-wide" type="submit">Acessar painel</button>
+        </form>
+        <div id="admin-content" hidden>
+          <div class="admin-tabs"><button type="button" class="admin-tab active" data-tab="orders">Pedidos</button><button type="button" class="admin-tab" data-tab="products">Produtos</button><button type="button" id="admin-logout" class="text-button">Sair</button></div>
+          <div class="admin-pane" id="orders-pane"><div class="admin-list-heading"><h3>Pedidos recentes</h3><button class="text-button" type="button" id="refresh-orders">Atualizar ↻</button></div><div class="admin-orders" id="admin-orders"></div></div>
+          <div class="admin-pane" id="products-pane" hidden>
+            <form class="product-form" id="product-form">
+              <h3>Adicionar produto</h3>
+              <div class="product-form-fields"><label class="field-label">Nome<input name="nome" required minlength="2" maxlength="120"></label><label class="field-label">Categoria<input name="tipo" required minlength="2" maxlength="60" placeholder="Ex.: Hambúrguer"></label><label class="field-label">Preço (R$)<input name="preco" required type="number" min="0" max="10000" step="0.01"></label></div>
+              <button class="button button-primary" type="submit">Adicionar produto</button>
+            </form>
+            <div class="admin-list-heading"><h3>Cardápio atual</h3></div><div class="admin-products" id="admin-products"></div>
+          </div>
+        </div>
+      </section>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

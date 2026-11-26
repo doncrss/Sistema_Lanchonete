@@ -28,6 +28,12 @@ class Pedido(Base):
     )
 
 
+class Mesa(Base):
+    __tablename__ = "mesas"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+
 class Cupom(Base):
     __tablename__ = "cupons"
 
@@ -43,6 +49,7 @@ class ItemPedido(Base):
     id = Column(Integer, primary_key=True, index=True)
     quantidade = Column(Integer, nullable=False)
     observacao = Column(String, nullable=True)
+    preco_unitario = Column(Float, nullable=False, default=0)
 
     fk_pedido = Column(
         Integer,
@@ -125,4 +132,3 @@ class Variacao(Base):
         ForeignKey("produtos.id"),
         nullable=False
     )
-
