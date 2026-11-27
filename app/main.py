@@ -16,7 +16,7 @@ from app import database
 from app.database import Base, get_db
 from app.models import pedido_models, produto_models, usuario_models
 from app.models.pedido_models import Entrega, HistoricoStatus, ItemPedido, Pedido
-from app.models.produto_models import Configuracao, Combo, ItemCombo, OpcaoVariacao, Produto
+from app.models.produto_models import Configuracao, Combo, ItemCombo, OpcaoVariacao, Produto, Fornecedor
 from app.models.usuario_models import Cliente
 from app.schemas.catalogo_schemas import (
     CatalogoProdutoResponse,
@@ -33,6 +33,7 @@ from app.schemas.checkout_schemas import (
     StatusPedidoUpdate,
 )
 from app.schemas.produto_schemas import ProdutoCreate, ProdutoResponse, ProdutoUpdate
+from app.schemas.fornecedor_schemas import FornecedorCreate, FornecedorResponse, FornecedorUpdate
 
 
 _ = pedido_models, produto_models, usuario_models
@@ -654,7 +655,43 @@ def atualizar_status_pedido(
 
 @app.get("/", include_in_schema=False)
 def frontend():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "minimal.html")
+
+
+@app.get("/api/fornecedores", response_model=list[FornecedorResponse], dependencies=[Depends(require_admin)])
+def listar_fornecedores(db: Session = Depends(get_db)):
+    return db.query(Fornecedor).order_by(Fornecedor.nome).all()
+
+
+@app.post("/api/fornecedores", response_model=FornecedorResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
+def criar_fornecedor(payload: FornecedorCreate, db: Session = Depends(get_db)):
+    fornecedor = Fornecedor(**payload.model_dump())
+    db.add(fornecedor)
+    db.commit()
+    db.refresh(fornecedor)
+    return fornecedor
+
+
+@app.put("/api/fornecedores/{fornecedor_id}", response_model=FornecedorResponse, dependencies=[Depends(require_admin)])
+def atualizar_fornecedor(fornecedor_id: int, payload: FornecedorUpdate, db: Session = Depends(get_db)):
+    fornecedor = db.get(Fornecedor, fornecedor_id)
+    if fornecedor is None:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado.")
+    for campo, valor in payload.model_dump(exclude_unset=True, exclude_none=True).items():
+        setattr(fornecedor, campo, valor)
+    db.commit()
+    db.refresh(fornecedor)
+    return fornecedor
+
+
+@app.delete("/api/fornecedores/{fornecedor_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
+def excluir_fornecedor(fornecedor_id: int, db: Session = Depends(get_db)):
+    fornecedor = db.get(Fornecedor, fornecedor_id)
+    if fornecedor is None:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado.")
+    db.delete(fornecedor)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend-assets")
