@@ -41,8 +41,8 @@ async function loadOrders(){const orders=await api("/api/pedidos",{},true);$("#a
 $("#refresh-orders").onclick=loadOrders;
 $("#admin-orders").onchange=async e=>{if(!e.target.dataset.status)return;try{await api(`/api/pedidos/${e.target.dataset.status}/status`,{method:"PATCH",body:JSON.stringify({status:e.target.value})},true);toast("Status atualizado!");loadOrders()}catch(err){toast(err.message)}};
 async function loadAdminProducts(){const ps=await api("/api/produtos");$("#admin-products").innerHTML=ps.map(p=>`<article class="admin-product"><strong>${esc(p.nome)}</strong><span>${esc(p.tipo)} · ${money.format(p.preco)}</span>${p.combo_id?`<button class="delete-product" data-delete-combo="${p.combo_id}">Excluir combo</button>`:`<button class="delete-product" data-delete-product="${p.id}">Excluir</button>`}</article>`).join("")+`<form id="product-form" class="product-form"><h3>Novo produto</h3><div class="product-form-fields"><label class="field-label">Nome<input name="nome" required></label><label class="field-label">Categoria<input name="tipo" required></label><label class="field-label">Preço<input name="preco" type="number" step="0.01" required></label></div><button class="button button-primary">Adicionar</button></form>`;}
-$("#products-tab").onclick=async()=>{$("#orders-pane").hidden=true;$("#products-pane").hidden=false;$("#suppliers-pane").hidden=true;$("#orders-tab").classList.remove("active");$("#suppliers-tab").classList.remove("active");$("#products-tab").classList.add("active");await loadAdminProducts()};
-$("#orders-tab").onclick=()=>{$("#orders-pane").hidden=false;$("#products-pane").hidden=true;$("#suppliers-pane").hidden=true;$("#orders-tab").classList.add("active");$("#products-tab").classList.remove("active");$("#suppliers-tab").classList.remove("active")};
+$("#products-tab").onclick=async()=>{$("#orders-pane").hidden=true;$("#products-pane").hidden=false;$("#combos-pane").hidden=true;$("#suppliers-pane").hidden=true;$("#orders-tab").classList.remove("active");$("#combos-tab").classList.remove("active");$("#suppliers-tab").classList.remove("active");$("#products-tab").classList.add("active");await loadAdminProducts()};
+$("#orders-tab").onclick=()=>{$("#orders-pane").hidden=false;$("#products-pane").hidden=true;$("#combos-pane").hidden=true;$("#suppliers-pane").hidden=true;$("#orders-tab").classList.add("active");$("#products-tab").classList.remove("active");$("#combos-tab").classList.remove("active");$("#suppliers-tab").classList.remove("active")};
 $("#admin-products").onsubmit=async e=>{if(e.target.id!=="product-form")return;e.preventDefault();const f=new FormData(e.target);try{await api("/api/produtos",{method:"POST",body:JSON.stringify({nome:f.get("nome"),tipo:f.get("tipo"),preco:Number(f.get("preco"))})},true);toast("Produto adicionado!");load();loadAdminProducts()}catch(err){toast(err.message)}};
 $("#admin-products").onclick=async e=>{const b=e.target.closest("[data-delete-product]");if(!b||!confirm("Excluir produto?"))return;try{await api(`/api/produtos/${b.dataset.deleteProduct}`,{method:"DELETE"},true);toast("Produto excluído!");load();loadAdminProducts()}catch(err){toast(err.message)}};
 async function loadSuppliers(){
@@ -50,8 +50,8 @@ async function loadSuppliers(){
   $("#admin-suppliers").innerHTML=suppliers.length?suppliers.map(s=>`<article class="admin-product"><div><strong>${esc(s.nome)}</strong><br><span>${esc(s.contato)}</span></div><button class="delete-product" data-delete-supplier="${s.id}">Excluir</button></article>`).join(""):"<p class=\"admin-empty\">Nenhum fornecedor cadastrado.</p>";
 }
 $("#suppliers-tab").onclick=async()=>{
-  $("#orders-pane").hidden=true;$("#products-pane").hidden=true;$("#suppliers-pane").hidden=false;
-  ["orders-tab","products-tab","suppliers-tab"].forEach(id=>$("#"+id).classList.toggle("active",id=== "suppliers-tab"));
+  $("#orders-pane").hidden=true;$("#products-pane").hidden=true;$("#combos-pane").hidden=true;$("#suppliers-pane").hidden=false;
+  ["orders-tab","products-tab","combos-tab","suppliers-tab"].forEach(id=>$("#"+id).classList.toggle("active",id=== "suppliers-tab"));
   try{await loadSuppliers()}catch(err){toast(err.message)}
 };
 $("#supplier-form").onsubmit=async e=>{
@@ -62,5 +62,39 @@ $("#admin-suppliers").onclick=async e=>{
   const b=e.target.closest("[data-delete-supplier]");if(!b||!confirm("Excluir este fornecedor?"))return;
   try{await api(`/api/fornecedores/${b.dataset.deleteSupplier}`,{method:"DELETE"},true);await loadSuppliers();toast("Fornecedor excluído!")}catch(err){toast(err.message)}
 };
+async function loadCombos(){
+  const products=await api("/api/produtos");
+  state.products=products;
+  const combos=products.filter(p=>p.combo_id);
+  $("#admin-combos").innerHTML=combos.length?combos.map(p=>`<article class="admin-combo"><div class="admin-combo-heading"><strong>${esc(p.nome)} · ${money.format(p.preco)}</strong><button class="delete-product" data-delete-combo="${p.combo_id}">Excluir</button></div><p>${esc(p.descricao||"")}</p><span>${p.itens_combo.map(i=>`${i.quantidade}× ${esc(i.nome)}${i.variacao?` · ${esc(i.variacao)}`:""}`).join(" · ")}</span></article>`).join(""):"<p class=\"admin-empty\">Nenhum combo cadastrado.</p>";
+}
+function comboVolume(row){
+  const productId=Number(row.querySelector('[name="produto_id"]').value);
+  const product=state.products.find(p=>p.id===productId);
+  const volumes=(product?.variacoes||[]).filter(o=>o.nome==="Volume");
+  const container=row.querySelector(".combo-item-volume");
+  container.innerHTML=volumes.length?`<select name="variacao_id">${volumes.map(o=>`<option value="${o.id}">${esc(o.valor)}</option>`).join("")}</select>`:"";
+}
+function addComboRow(){
+  const products=state.products.filter(p=>!p.combo_id);
+  if(!products.length){toast("Cadastre produtos antes de criar um combo.");return;}
+  const row=document.createElement("div");row.className="combo-item-row";
+  row.innerHTML=`<select name="produto_id" required>${products.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join("")}</select><input name="quantidade" type="number" min="1" max="50" value="1" required><div class="combo-item-volume"></div><button type="button" data-remove-combo-item>Remover</button>`;
+  $("#combo-item-rows").append(row);comboVolume(row);
+}
+$("#combos-tab").onclick=async()=>{
+  $("#orders-pane").hidden=true;$("#products-pane").hidden=true;$("#combos-pane").hidden=false;$("#suppliers-pane").hidden=true;
+  ["orders-tab","products-tab","combos-tab","suppliers-tab"].forEach(id=>$("#"+id).classList.toggle("active",id==="combos-tab"));
+  try{await loadCombos();if($("#combo-item-rows").children.length===0){addComboRow();addComboRow()}}catch(err){toast(err.message)}
+};
+$("#add-combo-item").onclick=addComboRow;
+$("#combo-item-rows").onchange=e=>{if(e.target.matches('[name="produto_id"]'))comboVolume(e.target.closest(".combo-item-row"))};
+$("#combo-item-rows").onclick=e=>{const b=e.target.closest("[data-remove-combo-item]");if(!b)return;if($("#combo-item-rows").children.length<=2){toast("Um combo precisa de pelo menos dois produtos.");return;}b.closest(".combo-item-row").remove()};
+$("#combo-form").onsubmit=async e=>{
+  e.preventDefault();const f=new FormData(e.target);$("#combo-error").textContent="";
+  const items=[...$("#combo-item-rows").querySelectorAll(".combo-item-row")].map(row=>({produto_id:Number(row.querySelector('[name="produto_id"]').value),quantidade:Number(row.querySelector('[name="quantidade"]').value),variacao_id:Number(row.querySelector('[name="variacao_id"]')?.value)||null}));
+  try{await api("/api/combos",{method:"POST",body:JSON.stringify({nome:f.get("nome"),descricao:f.get("descricao")||"",preco:Number(f.get("preco")),itens:items})},true);e.target.reset();$("#combo-item-rows").replaceChildren();addComboRow();addComboRow();await loadCombos();toast("Combo adicionado!")}catch(err){$("#combo-error").textContent=err.message}
+};
+$("#admin-combos").onclick=async e=>{const b=e.target.closest("[data-delete-combo]");if(!b||!confirm("Excluir este combo?"))return;try{await api(`/api/combos/${b.dataset.deleteCombo}`,{method:"DELETE"},true);await loadCombos();await load();toast("Combo excluído!")}catch(err){toast(err.message)}};
 
 load();
