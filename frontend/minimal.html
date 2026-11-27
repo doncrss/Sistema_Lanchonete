@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lanchotech — Deu fome? Resolveu.</title><link rel="stylesheet" href="/styles.css"><script src="/minimal.js" defer></script>
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/"><span class="brand-mark">L</span><span>lancho<span class="brand-accent">tech</span></span></a><button class="button button-outline" id="admin-open" type="button">Área da equipe</button></header>
+<main>
+  <section class="hero"><div class="hero-copy"><span class="eyebrow">LANCHOTECH</span><h1>Deu fome?<br><span>Resolveu.</span></h1><p>Seu lanche favorito, preparado na hora.</p><a class="button button-primary hero-cta" href="#cardapio">Ver cardápio ↓</a></div></section>
+  <section class="order-area" id="cardapio">
+    <div class="menu-column"><div class="section-heading"><h2>Nosso cardápio</h2><label class="search-box"><input id="search" type="search" placeholder="Buscar"></label></div><nav class="categories" id="categories"></nav><div class="menu-message" id="message">Carregando...</div><div class="product-grid" id="products"></div></div>
+    <aside class="cart-panel"><div class="cart-title"><h2>Sua sacola <span class="cart-count" id="cart-count">0</span></h2></div><div class="cart-empty" id="cart-empty"><strong>Sua sacola está vazia</strong></div><div class="cart-items" id="cart-items"></div><div class="cart-bottom" id="cart-bottom" hidden><div class="cart-total"><span>Total</span><strong id="cart-total">R$ 0,00</strong></div><button class="button button-primary checkout-open" id="checkout-open">Continuar para entrega →</button></div></aside>
+  </section>
+</main>
+<footer><a class="brand footer-brand" href="#"><span class="brand-mark">L</span><span>lancho<span class="brand-accent">tech</span></span></a><span>Feito na hora. Feito pra você. <b>♥</b></span></footer>
+
+<dialog class="modal" id="checkout-modal"><form class="modal-card" id="checkout-form"><button class="modal-close" type="button" data-close="checkout-modal">×</button><span class="eyebrow">SÓ MAIS UM PASSO</span><h2>Onde entregamos?</h2>
+  <label class="field-label">Seu nome<input name="nome" required minlength="2" maxlength="120"></label><label class="field-label">WhatsApp<input name="contato" required minlength="8" maxlength="40"></label>
+  <label class="field-label">Receber<select name="local" id="order-local"><option value="entrega">Entrega</option><option value="retirada">Retirada</option><option value="mesa">Consumir no local</option></select></label>
+  <label class="field-label" id="address-field">Endereço<input name="endereco" maxlength="240"></label><div class="checkout-total"><span>Total</span><strong id="checkout-total">R$ 0,00</strong></div><p class="form-error" id="checkout-error"></p><button class="button button-primary button-wide">Enviar pedido →</button></form></dialog>
+
+<dialog class="modal admin-modal" id="admin-modal"><section class="modal-card admin-card"><button class="modal-close" type="button" data-close="admin-modal">×</button><div class="admin-heading"><div><span class="eyebrow">BASTIDORES</span><h2>Área da equipe</h2></div></div>
+  <form id="admin-login" class="admin-login"><label class="field-label">Chave ADMIN_TOKEN<input name="token" type="password" required></label><p class="form-error" id="admin-error"></p><button class="button button-primary button-wide">Acessar</button></form>
+  <div id="admin-content" hidden><div class="admin-tabs"><button class="admin-tab active" type="button" id="orders-tab">Pedidos</button><button class="admin-tab" type="button" id="products-tab">Produtos</button><button class="text-button" type="button" id="admin-logout">Sair</button></div><div class="admin-pane" id="orders-pane"><div class="admin-list-heading"><h3>Pedidos recentes</h3><button class="text-button" type="button" id="refresh-orders">Atualizar</button></div><div id="admin-orders"></div></div><div class="admin-pane" id="products-pane" hidden><div id="admin-products"></div></div></div>
+</section></dialog>
+<div class="toast" id="toast"></div>
+</body></html>

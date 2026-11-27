@@ -18,7 +18,7 @@ Requer Python 3.10+.
 3. Inicie o site e a API juntos:
 
    ```powershell
-   uvicorn app.main:app --reload
+   uvicorn app.api_app:app --reload
    ```
 
 4. Abra `http://localhost:8000`. A documentação da API está em `http://localhost:8000/docs`.
