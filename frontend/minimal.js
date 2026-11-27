@@ -41,9 +41,26 @@ async function loadOrders(){const orders=await api("/api/pedidos",{},true);$("#a
 $("#refresh-orders").onclick=loadOrders;
 $("#admin-orders").onchange=async e=>{if(!e.target.dataset.status)return;try{await api(`/api/pedidos/${e.target.dataset.status}/status`,{method:"PATCH",body:JSON.stringify({status:e.target.value})},true);toast("Status atualizado!");loadOrders()}catch(err){toast(err.message)}};
 async function loadAdminProducts(){const ps=await api("/api/produtos");$("#admin-products").innerHTML=ps.map(p=>`<article class="admin-product"><strong>${esc(p.nome)}</strong><span>${esc(p.tipo)} · ${money.format(p.preco)}</span>${p.combo_id?`<button class="delete-product" data-delete-combo="${p.combo_id}">Excluir combo</button>`:`<button class="delete-product" data-delete-product="${p.id}">Excluir</button>`}</article>`).join("")+`<form id="product-form" class="product-form"><h3>Novo produto</h3><div class="product-form-fields"><label class="field-label">Nome<input name="nome" required></label><label class="field-label">Categoria<input name="tipo" required></label><label class="field-label">Preço<input name="preco" type="number" step="0.01" required></label></div><button class="button button-primary">Adicionar</button></form>`;}
-$("#products-tab").onclick=async()=>{$("#orders-pane").hidden=true;$("#products-pane").hidden=false;$("#orders-tab").classList.remove("active");$("#products-tab").classList.add("active");await loadAdminProducts()};
-$("#orders-tab").onclick=()=>{$("#orders-pane").hidden=false;$("#products-pane").hidden=true;$("#orders-tab").classList.add("active");$("#products-tab").classList.remove("active")};
+$("#products-tab").onclick=async()=>{$("#orders-pane").hidden=true;$("#products-pane").hidden=false;$("#suppliers-pane").hidden=true;$("#orders-tab").classList.remove("active");$("#suppliers-tab").classList.remove("active");$("#products-tab").classList.add("active");await loadAdminProducts()};
+$("#orders-tab").onclick=()=>{$("#orders-pane").hidden=false;$("#products-pane").hidden=true;$("#suppliers-pane").hidden=true;$("#orders-tab").classList.add("active");$("#products-tab").classList.remove("active");$("#suppliers-tab").classList.remove("active")};
 $("#admin-products").onsubmit=async e=>{if(e.target.id!=="product-form")return;e.preventDefault();const f=new FormData(e.target);try{await api("/api/produtos",{method:"POST",body:JSON.stringify({nome:f.get("nome"),tipo:f.get("tipo"),preco:Number(f.get("preco"))})},true);toast("Produto adicionado!");load();loadAdminProducts()}catch(err){toast(err.message)}};
 $("#admin-products").onclick=async e=>{const b=e.target.closest("[data-delete-product]");if(!b||!confirm("Excluir produto?"))return;try{await api(`/api/produtos/${b.dataset.deleteProduct}`,{method:"DELETE"},true);toast("Produto excluído!");load();loadAdminProducts()}catch(err){toast(err.message)}};
+async function loadSuppliers(){
+  const suppliers=await api("/api/fornecedores",{},true);
+  $("#admin-suppliers").innerHTML=suppliers.length?suppliers.map(s=>`<article class="admin-product"><div><strong>${esc(s.nome)}</strong><br><span>${esc(s.contato)}</span></div><button class="delete-product" data-delete-supplier="${s.id}">Excluir</button></article>`).join(""):"<p class=\"admin-empty\">Nenhum fornecedor cadastrado.</p>";
+}
+$("#suppliers-tab").onclick=async()=>{
+  $("#orders-pane").hidden=true;$("#products-pane").hidden=true;$("#suppliers-pane").hidden=false;
+  ["orders-tab","products-tab","suppliers-tab"].forEach(id=>$("#"+id).classList.toggle("active",id=== "suppliers-tab"));
+  try{await loadSuppliers()}catch(err){toast(err.message)}
+};
+$("#supplier-form").onsubmit=async e=>{
+  e.preventDefault();const f=new FormData(e.target);
+  try{await api("/api/fornecedores",{method:"POST",body:JSON.stringify({nome:f.get("nome"),contato:f.get("contato")})},true);e.target.reset();await loadSuppliers();toast("Fornecedor adicionado!")}catch(err){toast(err.message)}
+};
+$("#admin-suppliers").onclick=async e=>{
+  const b=e.target.closest("[data-delete-supplier]");if(!b||!confirm("Excluir este fornecedor?"))return;
+  try{await api(`/api/fornecedores/${b.dataset.deleteSupplier}`,{method:"DELETE"},true);await loadSuppliers();toast("Fornecedor excluído!")}catch(err){toast(err.message)}
+};
 
 load();

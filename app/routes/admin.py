@@ -5,6 +5,8 @@ from app.database import get_db
 from app.security import require_admin
 from app.schemas.catalogo_schemas import ComboCreate, ComboResponse, OpcaoVariacaoCreate, OpcaoVariacaoResponse
 from app.schemas.produto_schemas import ProdutoCreate, ProdutoUpdate, ProdutoResponse
+from app.schemas.fornecedor_schemas import FornecedorCreate, FornecedorResponse, FornecedorUpdate
+from app.models.produto_models import Fornecedor
 from app.services import admin_service
 
 router = APIRouter(prefix="/api", tags=["Gestão"], dependencies=[Depends(require_admin)])
@@ -36,3 +38,23 @@ def criar_combo(payload: ComboCreate, db: Session = Depends(get_db)):
 @router.delete("/combos/{combo_id}", status_code=204)
 def excluir_combo(combo_id: int, db: Session = Depends(get_db)):
     admin_service.delete_combo(db, combo_id); return Response(status_code=204)
+
+@router.get("/fornecedores", response_model=list[FornecedorResponse])
+def listar_fornecedores(db: Session = Depends(get_db)):
+    return db.query(Fornecedor).order_by(Fornecedor.nome).all()
+
+
+@router.post("/fornecedores", response_model=FornecedorResponse, status_code=201)
+def criar_fornecedor(payload: FornecedorCreate, db: Session = Depends(get_db)):
+    return admin_service.create_supplier(db, payload)
+
+
+@router.put("/fornecedores/{fornecedor_id}", response_model=FornecedorResponse)
+def atualizar_fornecedor(fornecedor_id: int, payload: FornecedorUpdate, db: Session = Depends(get_db)):
+    return admin_service.update_supplier(db, fornecedor_id, payload)
+
+
+@router.delete("/fornecedores/{fornecedor_id}", status_code=204)
+def excluir_fornecedor(fornecedor_id: int, db: Session = Depends(get_db)):
+    admin_service.delete_supplier(db, fornecedor_id)
+    return Response(status_code=204)

@@ -2,10 +2,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.produto_models import Combo, ItemCombo, OpcaoVariacao, Produto
+from app.models.produto_models import Combo, ItemCombo, OpcaoVariacao, Produto, Fornecedor
 from app.models.pedido_models import ItemPedido
 from app.schemas.catalogo_schemas import ComboCreate, ComboResponse, ItemComboResponse, OpcaoVariacaoCreate
 from app.schemas.produto_schemas import ProdutoCreate, ProdutoUpdate
+from app.schemas.fornecedor_schemas import FornecedorCreate, FornecedorUpdate
 
 
 def combo_response(db: Session, combo: Combo) -> ComboResponse:
@@ -93,3 +94,30 @@ def delete_product(db: Session, product_id: int):
     try: db.commit()
     except IntegrityError:
         db.rollback(); raise HTTPException(status.HTTP_409_CONFLICT, "Produto vinculado a pedidos não pode ser excluído.")
+
+
+def create_supplier(db: Session, payload: FornecedorCreate):
+    supplier = Fornecedor(**payload.model_dump())
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+    return supplier
+
+
+def update_supplier(db: Session, supplier_id: int, payload: FornecedorUpdate):
+    supplier = db.get(Fornecedor, supplier_id)
+    if not supplier:
+        raise HTTPException(404, "Fornecedor não encontrado.")
+    for field, value in payload.model_dump(exclude_unset=True, exclude_none=True).items():
+        setattr(supplier, field, value)
+    db.commit()
+    db.refresh(supplier)
+    return supplier
+
+
+def delete_supplier(db: Session, supplier_id: int):
+    supplier = db.get(Fornecedor, supplier_id)
+    if not supplier:
+        raise HTTPException(404, "Fornecedor não encontrado.")
+    db.delete(supplier)
+    db.commit()
